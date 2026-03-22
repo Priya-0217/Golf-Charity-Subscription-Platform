@@ -12,7 +12,15 @@ import { CharityImpactCard } from '@/components/dashboard/CharityImpactCard'
 import { CheckoutSuccessSync } from '@/components/dashboard/CheckoutSuccessSync'
 import { NotificationDropdown } from '@/components/dashboard/NotificationDropdown'
 import { calculatePoolsFromSubscribers } from '@/lib/prize-pool'
-import { Trophy, Users, TrendingUp, DollarSign } from 'lucide-react'
+import { computeNextDrawDate, formatNextDrawLong } from '@/lib/draw-schedule'
+import Link from 'next/link'
+import { Trophy, TrendingUp } from 'lucide-react'
+
+function winnerTierCopy(matchTier: number) {
+  if (matchTier === 5) return 'Jackpot tier winner'
+  if (matchTier === 4) return '4-match tier winner'
+  return '3-match tier winner'
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -136,14 +144,29 @@ export default async function DashboardPage() {
     ? (scores.reduce((acc, s) => acc + s.score, 0) / scores.length).toFixed(1)
     : 0
 
-  // Next draw target: 1 minute from now (refresh page to reset). Replace with scheduled draw from DB for production.
-  const nextDrawAt = new Date(Date.now() + 60 * 1000)
-  const nextDrawDate = nextDrawAt.toISOString()
-  const nextDrawHeaderLabel = `~1 min · ${nextDrawAt.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-  })}`
+  const publishedDrawCount = recentPublishedDraws?.length ?? 0
+  const nextDrawInstant = computeNextDrawDate(latestDraw?.draw_date ?? null)
+  const nextDrawDate = nextDrawInstant.toISOString()
+  const nextDrawAtLabel = `Next live draw: ${formatNextDrawLong(nextDrawInstant)}`
+  const lastDrawDateLabel = latestDraw?.draw_date
+    ? new Date(latestDraw.draw_date as string).toLocaleDateString(undefined, { dateStyle: 'long' })
+    : null
+  const drawStatusLine = lastDrawDateLabel
+    ? `Published draws: ${publishedDrawCount}. Latest results: ${lastDrawDateLabel}. Your last five Stableford scores (1–45) are your numbers for the next draw.`
+    : `Published draws: ${publishedDrawCount}. When the first draw is published, results and replays appear here and below.`
+
+  const adminForWinners = createAdminClient()
+  const { data: platformWinners } = await adminForWinners
+    .from('winners')
+    .select('prize_amount, match_tier')
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  const lastWinnersForCard =
+    platformWinners?.map((w) => ({
+      label: winnerTierCopy(Number(w.match_tier)),
+      prize: Number(w.prize_amount),
+    })) ?? []
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -161,6 +184,12 @@ export default async function DashboardPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <Link
+                href="/draws"
+                className="hidden text-sm font-bold text-green-700 hover:text-green-800 sm:inline"
+              >
+                Draw history
+              </Link>
               <NotificationDropdown />
               <div className="h-10 w-px bg-gray-100 mx-2" />
               <div className="flex items-center gap-3 pl-2">
@@ -192,10 +221,15 @@ export default async function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm font-bold text-gray-600">Next draw: {nextDrawHeaderLabel}</span>
-            </div>
+            <Link
+              href="/draws"
+              className="px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3 hover:border-green-200 transition-colors max-w-md"
+            >
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+              <span className="text-sm font-bold text-gray-700 line-clamp-2">
+                Next draw: {formatNextDrawLong(nextDrawInstant)}
+              </span>
+            </Link>
           </div>
         </header>
 
@@ -217,18 +251,18 @@ export default async function DashboardPage() {
             iconClassName="bg-blue-50 text-blue-600"
           />
           <StatsCard
-            title="Draws Entered"
-            value={winnings?.length || 0}
-            description="Monthly participation"
+            title="Published draws"
+            value={publishedDrawCount}
+            description="Completed monthly runs"
             icon="trophy"
             iconClassName="bg-green-50 text-green-600"
           />
           <StatsCard
-            title="Community"
-            value="12.4k"
-            description="Active golfers"
-            icon="users"
-            iconClassName="bg-purple-50 text-purple-600"
+            title="Your prizes"
+            value={winnings?.length || 0}
+            description="Recorded wins"
+            icon="trophy"
+            iconClassName="bg-emerald-50 text-emerald-700"
           />
         </div>
 
@@ -238,16 +272,15 @@ export default async function DashboardPage() {
             {/* Draw Experience */}
             <DrawCard
               nextDrawDate={nextDrawDate}
+              nextDrawAtLabel={nextDrawAtLabel}
+              drawStatusLine={drawStatusLine}
               currentNumbers={userDrawNumbers}
               yourNumbersBadge={
                 winningNumbers.length === 5
                   ? `${userDrawNumbers.length}/5 scores · ${userMatchCount} match${userMatchCount === 1 ? "" : "es"} latest`
                   : `${userDrawNumbers.length}/5 scores`
               }
-              lastWinners={[
-                { name: "Alex M.", prize: 1250 },
-                { name: "Sarah K.", prize: 450 }
-              ]}
+              lastWinners={lastWinnersForCard}
               drawRevealSlot={
                 latestDraw && winningNumbers.length === 5 ? (
                   <DrawReveal
