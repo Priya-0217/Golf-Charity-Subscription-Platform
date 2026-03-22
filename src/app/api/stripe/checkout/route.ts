@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
+import { planTypeFromPriceId, STRIPE_PRICE_MONTHLY } from '@/lib/stripe-plans'
 
 export async function POST(req: Request) {
   try {
@@ -55,6 +56,10 @@ export async function POST(req: Request) {
       }
     }
 
+    const planType = planTypeFromPriceId(
+      typeof priceId === 'string' ? priceId : STRIPE_PRICE_MONTHLY
+    )
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [
@@ -64,12 +69,17 @@ export async function POST(req: Request) {
         },
       ],
       mode: 'subscription',
+      /** Required: webhook reads this — subscription_data metadata alone is not on the session object. */
+      metadata: {
+        supabaseUUID: user.id,
+        planType,
+      },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?canceled=true`,
       subscription_data: {
         metadata: {
           supabaseUUID: user.id,
-          planType: priceId === 'price_1TDgnICjCqYNHI0m0G8xc1Io' ? 'monthly' : 'yearly'
+          planType,
         },
       },
     })

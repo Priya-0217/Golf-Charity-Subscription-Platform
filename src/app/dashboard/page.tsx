@@ -9,6 +9,7 @@ import { StatsCard } from '@/components/dashboard/StatsCard'
 import { DrawCard } from '@/components/dashboard/DrawCard'
 import { DrawReveal } from '@/components/dashboard/DrawReveal'
 import { CharityImpactCard } from '@/components/dashboard/CharityImpactCard'
+import { CheckoutSuccessSync } from '@/components/dashboard/CheckoutSuccessSync'
 import { NotificationDropdown } from '@/components/dashboard/NotificationDropdown'
 import { calculatePoolsFromSubscribers } from '@/lib/prize-pool'
 import { Trophy, Users, TrendingUp, DollarSign } from 'lucide-react'
@@ -123,10 +124,12 @@ export default async function DashboardPage() {
   const userMatchCount =
     winningNumbers.length === 5 ? countMatches(userDrawNumbers, winningNumbers) : 0
 
-  // Determine effective status (prefer active subscription from table)
-  const effectiveStatus = subscription?.status === 'active' 
-    ? 'active' 
-    : (profile?.subscription_status || 'inactive')
+  const subscriptionRowActive = subscription?.status === 'active'
+  const profileMarkedActive = profile?.subscription_status === 'active'
+  const effectiveStatus =
+    subscriptionRowActive || profileMarkedActive
+      ? 'active'
+      : profile?.subscription_status || 'inactive'
 
   const totalWinnings = winnings?.reduce((acc, w) => acc + w.prize_amount, 0) || 0
   const avgScore = scores && scores.length > 0 
@@ -177,6 +180,7 @@ export default async function DashboardPage() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <CheckoutSuccessSync />
         {/* Welcome Section */}
         <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>

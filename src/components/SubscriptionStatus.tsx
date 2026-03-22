@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { BadgeCheck, CreditCard, ChevronRight } from 'lucide-react'
+import { STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY } from '@/lib/stripe-plans'
 
 export function SubscriptionStatus({ status, planType }: { status: string; planType?: string }) {
   const [loading, setLoading] = useState(false)
@@ -60,7 +61,7 @@ export function SubscriptionStatus({ status, planType }: { status: string; planT
         {!isActive && (
           <div className="space-y-3 pt-2">
             <Button
-              onClick={() => handleSubscribe('price_1TDgnICjCqYNHI0m0G8xc1Io')}
+              onClick={() => handleSubscribe(STRIPE_PRICE_MONTHLY)}
               disabled={loading}
               className="w-full bg-green-600 hover:bg-green-700 text-white h-12 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg shadow-green-600/20 flex items-center justify-between px-6 transition-all active:scale-95"
             >
@@ -69,7 +70,7 @@ export function SubscriptionStatus({ status, planType }: { status: string; planT
             </Button>
             <Button
               variant="outline"
-              onClick={() => handleSubscribe('price_1TDgpDCjCqYNHI0muleBt9jH')}
+              onClick={() => handleSubscribe(STRIPE_PRICE_YEARLY)}
               disabled={loading}
               className="w-full border-green-600 text-green-600 hover:bg-green-50 h-12 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-between px-6 transition-all active:scale-95"
             >
