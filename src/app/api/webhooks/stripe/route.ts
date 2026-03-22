@@ -34,8 +34,14 @@ export async function POST(req: Request) {
         .eq('id', supabaseUUID)
 
       // Create or update subscription record
-      const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
-      
+      const subscription = (await stripe.subscriptions.retrieve(
+        session.subscription as string
+      )) as unknown as {
+        id: string
+        current_period_start: number
+        current_period_end: number
+      }
+
       await supabase
         .from('subscriptions')
         .upsert({

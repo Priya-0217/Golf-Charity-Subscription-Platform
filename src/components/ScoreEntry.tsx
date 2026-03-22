@@ -26,8 +26,17 @@ export function ScoreEntry({ initialScores }: { initialScores: Score[] }) {
 
   const handleAddScore = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newScore || parseInt(newScore) < 1 || parseInt(newScore) > 45) {
+    const parsed = parseInt(newScore, 10)
+    if (!newScore || Number.isNaN(parsed) || parsed < 1 || parsed > 45) {
       alert('Score must be between 1 and 45')
+      return
+    }
+
+    const played = new Date(newDate + 'T12:00:00')
+    const endOfToday = new Date()
+    endOfToday.setHours(23, 59, 59, 999)
+    if (played > endOfToday) {
+      alert('Date cannot be in the future')
       return
     }
 
@@ -57,7 +66,9 @@ export function ScoreEntry({ initialScores }: { initialScores: Score[] }) {
           <Trophy className="w-5 h-5 text-green-600" />
           Last 5 Scores
         </h2>
-        <p className="text-sm text-gray-500">Only your latest 5 count for the draw</p>
+        <p className="text-sm text-gray-500 max-w-[16rem] sm:max-w-none text-right sm:text-left">
+          Only your latest 5 scores count toward the draw
+        </p>
       </div>
 
       <form onSubmit={handleAddScore} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 items-end">
@@ -93,15 +104,23 @@ export function ScoreEntry({ initialScores }: { initialScores: Score[] }) {
         </Button>
       </form>
 
+      {scores.length > 0 && (
+        <p className="mb-4 text-sm font-semibold text-green-700">
+          Average (last {scores.length}):{' '}
+          {(scores.reduce((a, s) => a + s.score, 0) / scores.length).toFixed(1)} pts
+        </p>
+      )}
+
       <div className="space-y-3">
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} mode="popLayout">
           {scores.map((s, idx) => (
             <motion.div
               key={s.id}
-              initial={{ opacity: 0, x: -20 }}
+              layout
+              initial={{ opacity: 0, x: 28 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ delay: idx * 0.05 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 28, delay: idx * 0.02 }}
               className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100"
             >
               <div className="flex items-center gap-4">

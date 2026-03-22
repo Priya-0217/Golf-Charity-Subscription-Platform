@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
+import Link from "next/link"
 import { motion } from "framer-motion"
 import { Timer, Trophy, ArrowRight, Sparkles } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +12,9 @@ interface DrawCardProps {
   nextDrawDate: string
   currentNumbers?: number[]
   lastWinners?: Array<{ name: string; prize: number }>
-  eligibilityTier: number
+  /** Short label next to “Your Draw Numbers” (e.g. 5/5 scores, match count) */
+  yourNumbersBadge?: string
+  drawRevealSlot?: ReactNode
   className?: string
 }
 
@@ -19,7 +22,8 @@ export function DrawCard({
   nextDrawDate,
   currentNumbers = [],
   lastWinners = [],
-  eligibilityTier,
+  yourNumbersBadge,
+  drawRevealSlot,
   className,
 }: DrawCardProps) {
   const [isMounted, setIsMounted] = useState(false)
@@ -32,21 +36,26 @@ export function DrawCard({
 
   useEffect(() => {
     setIsMounted(true)
-    const timer = setInterval(() => {
-      const now = new Date().getTime()
-      const distance = new Date(nextDrawDate).getTime() - now
+    const target = new Date(nextDrawDate).getTime()
 
-      if (distance < 0) {
-        clearInterval(timer)
-        return
+    const tick = () => {
+      const distance = target - Date.now()
+      if (distance <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+        return false
       }
-
       setTimeLeft({
         days: Math.floor(distance / (1000 * 60 * 60 * 24)),
         hours: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
         minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
         seconds: Math.floor((distance % (1000 * 60)) / 1000),
       })
+      return true
+    }
+
+    tick()
+    const timer = setInterval(() => {
+      if (!tick()) clearInterval(timer)
     }, 1000)
 
     return () => clearInterval(timer)
@@ -72,12 +81,21 @@ export function DrawCard({
             { label: "Mins", value: timeLeft.minutes },
             { label: "Secs", value: timeLeft.seconds },
           ].map((item) => (
-            <div key={item.label} className="text-center">
-              <div className="text-3xl font-black mb-1">{String(item.value).padStart(2, "0")}</div>
+            <motion.div
+              key={item.label}
+              className="text-center"
+              animate={item.label === "Secs" ? { opacity: [1, 0.85, 1] } : undefined}
+              transition={
+                item.label === "Secs"
+                  ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" }
+                  : undefined
+              }
+            >
+              <div className="text-3xl font-black mb-1 tabular-nums">{String(item.value).padStart(2, "0")}</div>
               <div className="text-[10px] font-bold uppercase tracking-tighter text-gray-500">
                 {item.label}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
 
@@ -88,9 +106,11 @@ export function DrawCard({
               <Sparkles className="w-4 h-4 text-yellow-400" />
               Your Draw Numbers
             </p>
-            <span className="text-[10px] font-black uppercase tracking-widest text-yellow-400 px-2 py-0.5 rounded-full bg-yellow-400/10">
-              {eligibilityTier}-Match Tier
-            </span>
+            {yourNumbersBadge ? (
+              <span className="text-[10px] font-black uppercase tracking-widest text-yellow-400 px-2 py-0.5 rounded-full bg-yellow-400/10 max-w-[14rem] truncate">
+                {yourNumbersBadge}
+              </span>
+            ) : null}
           </div>
           <div className="flex gap-2 justify-center">
             {currentNumbers.length > 0 ? (
@@ -110,6 +130,10 @@ export function DrawCard({
             )}
           </div>
         </div>
+
+        {drawRevealSlot && (
+          <div className="pt-2 border-t border-white/10">{drawRevealSlot}</div>
+        )}
 
         {/* Last Winners */}
         {lastWinners.length > 0 && (
@@ -131,9 +155,11 @@ export function DrawCard({
           </div>
         )}
 
-        <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 rounded-xl group">
-          View Draw Details
-          <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+        <Button asChild className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 rounded-xl group">
+          <Link href="/draws">
+            View draw history
+            <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+          </Link>
         </Button>
       </CardContent>
     </Card>

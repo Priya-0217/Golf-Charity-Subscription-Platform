@@ -7,8 +7,10 @@ import { CharitySummary } from '@/components/CharitySummary'
 import { SubscriptionStatus } from '@/components/SubscriptionStatus'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { DrawCard } from '@/components/dashboard/DrawCard'
+import { DrawReveal } from '@/components/dashboard/DrawReveal'
 import { CharityImpactCard } from '@/components/dashboard/CharityImpactCard'
 import { NotificationDropdown } from '@/components/dashboard/NotificationDropdown'
+import { calculatePoolsFromSubscribers } from '@/lib/prize-pool'
 import { Trophy, Users, TrendingUp, DollarSign } from 'lucide-react'
 
 export default async function DashboardPage() {
@@ -67,6 +69,60 @@ export default async function DashboardPage() {
     .eq('status', 'active')
     .maybeSingle()
 
+  const { count: activeSubscriberCount } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .eq('subscription_status', 'active')
+
+  const { data: recentPublishedDraws } = await supabase
+    .from('draws')
+    .select('*')
+    .eq('status', 'published')
+    .order('created_at', { ascending: false })
+    .limit(12)
+
+  const latestDraw = recentPublishedDraws?.[0]
+  const previousPublishedDraw = recentPublishedDraws?.[1]
+  const rolloverFromLastMonth = previousPublishedDraw?.jackpot_rollover ?? 0
+
+  const livePools = calculatePoolsFromSubscribers(activeSubscriberCount ?? 0)
+
+  let drawWinnersForLatest: { match_tier: number; prize_amount: number; user_id: string }[] = []
+  if (latestDraw?.id) {
+    const { data: w } = await supabase
+      .from('winners')
+      .select('match_tier, prize_amount, user_id')
+      .eq('draw_id', latestDraw.id)
+    drawWinnersForLatest = w ?? []
+  }
+
+  const winners5 = drawWinnersForLatest.filter((w) => w.match_tier === 5).length
+  const winners4 = drawWinnersForLatest.filter((w) => w.match_tier === 4).length
+  const winners3 = drawWinnersForLatest.filter((w) => w.match_tier === 3).length
+
+  const prizePool5Base = latestDraw?.prize_pool_5 ?? livePools.pool5
+  const prizePool4Base = latestDraw?.prize_pool_4 ?? livePools.pool4
+  const prizePool3Base = latestDraw?.prize_pool_3 ?? livePools.pool3
+  const jackpotPoolTotal = prizePool5Base + rolloverFromLastMonth
+
+  const estimatedPrize5 = winners5 > 0 ? jackpotPoolTotal / winners5 : jackpotPoolTotal
+  const estimatedPrize4 = winners4 > 0 ? prizePool4Base / winners4 : prizePool4Base
+  const estimatedPrize3 = winners3 > 0 ? prizePool3Base / winners3 : prizePool3Base
+
+  const myWinForLatestDraw = drawWinnersForLatest.find((w) => w.user_id === user.id)
+
+  const winningNumbers = Array.isArray(latestDraw?.winning_numbers)
+    ? (latestDraw!.winning_numbers as number[])
+    : []
+  const userDrawNumbers = (scores ?? []).map((s) => s.score)
+  const countMatches = (u: number[], w: number[]) => {
+    if (w.length !== 5) return 0
+    const ws = new Set(w)
+    return u.filter((n) => ws.has(n)).length
+  }
+  const userMatchCount =
+    winningNumbers.length === 5 ? countMatches(userDrawNumbers, winningNumbers) : 0
+
   // Determine effective status (prefer active subscription from table)
   const effectiveStatus = subscription?.status === 'active' 
     ? 'active' 
@@ -76,6 +132,15 @@ export default async function DashboardPage() {
   const avgScore = scores && scores.length > 0 
     ? (scores.reduce((acc, s) => acc + s.score, 0) / scores.length).toFixed(1)
     : 0
+
+  // Next draw target: 1 minute from now (refresh page to reset). Replace with scheduled draw from DB for production.
+  const nextDrawAt = new Date(Date.now() + 60 * 1000)
+  const nextDrawDate = nextDrawAt.toISOString()
+  const nextDrawHeaderLabel = `~1 min · ${nextDrawAt.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  })}`
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -125,7 +190,7 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-3">
             <div className="px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm font-bold text-gray-600">Next Draw: March 31</span>
+              <span className="text-sm font-bold text-gray-600">Next draw: {nextDrawHeaderLabel}</span>
             </div>
           </div>
         </header>
@@ -168,13 +233,32 @@ export default async function DashboardPage() {
           <div className="lg:col-span-2 space-y-8">
             {/* Draw Experience */}
             <DrawCard
-              nextDrawDate="2026-03-31T20:00:00"
-              currentNumbers={[12, 24, 35, 42, 7]}
-              eligibilityTier={5}
+              nextDrawDate={nextDrawDate}
+              currentNumbers={userDrawNumbers}
+              yourNumbersBadge={
+                winningNumbers.length === 5
+                  ? `${userDrawNumbers.length}/5 scores · ${userMatchCount} match${userMatchCount === 1 ? "" : "es"} latest`
+                  : `${userDrawNumbers.length}/5 scores`
+              }
               lastWinners={[
                 { name: "Alex M.", prize: 1250 },
                 { name: "Sarah K.", prize: 450 }
               ]}
+              drawRevealSlot={
+                latestDraw && winningNumbers.length === 5 ? (
+                  <DrawReveal
+                    drawId={latestDraw.id}
+                    winningNumbers={winningNumbers}
+                    userNumbers={userDrawNumbers}
+                    rolloverFromLastMonth={rolloverFromLastMonth}
+                    jackpotPoolTotal={jackpotPoolTotal}
+                    estimatedPrize5={estimatedPrize5}
+                    estimatedPrize4={estimatedPrize4}
+                    estimatedPrize3={estimatedPrize3}
+                    userPrizeAmount={myWinForLatestDraw?.prize_amount ?? null}
+                  />
+                ) : null
+              }
             />
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

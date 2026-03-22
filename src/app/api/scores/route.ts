@@ -12,6 +12,22 @@ export async function POST(req: Request) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
+    }
+
+    const played = new Date(`${date}T12:00:00`)
+    const endOfToday = new Date()
+    endOfToday.setHours(23, 59, 59, 999)
+    if (played > endOfToday) {
+      return NextResponse.json({ error: 'Date cannot be in the future' }, { status: 400 })
+    }
+
+    const n = Number(score)
+    if (!Number.isInteger(n) || n < 1 || n > 45) {
+      return NextResponse.json({ error: 'Score must be between 1 and 45' }, { status: 400 })
+    }
+
     // 0. Ensure profile exists (Self-healing mechanism using admin client to bypass RLS)
     const { data: profile } = await supabase
       .from('profiles')
@@ -42,7 +58,7 @@ export async function POST(req: Request) {
       .from('scores')
       .insert({
         user_id: user.id,
-        score,
+        score: n,
         date,
       })
 
