@@ -31,7 +31,7 @@ export default function AdminDrawsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-8">
+    <div className="p-6 sm:p-8">
       <div className="max-w-4xl mx-auto">
         <header className="mb-12">
           <h1 className="text-3xl font-bold text-gray-900">Monthly Draw Execution</h1>

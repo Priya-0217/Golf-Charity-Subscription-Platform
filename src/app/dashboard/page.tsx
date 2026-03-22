@@ -14,7 +14,7 @@ import { NotificationDropdown } from '@/components/dashboard/NotificationDropdow
 import { calculatePoolsFromSubscribers } from '@/lib/prize-pool'
 import { computeNextDrawDate, formatNextDrawLong } from '@/lib/draw-schedule'
 import Link from 'next/link'
-import { Trophy, TrendingUp } from 'lucide-react'
+import { Trophy, TrendingUp, Shield } from 'lucide-react'
 
 function winnerTierCopy(matchTier: number) {
   if (matchTier === 5) return 'Jackpot tier winner'
@@ -46,7 +46,8 @@ export default async function DashboardPage() {
         id: user.id,
         email: user.email!,
         full_name: user.user_metadata?.full_name || 'Golfer',
-        subscription_status: 'inactive'
+        subscription_status: 'inactive',
+        role: user.email === 'prilgupta017@gmail.com' ? 'admin' : 'user'
       })
     
     // Fetch it again now that it's created
@@ -57,6 +58,18 @@ export default async function DashboardPage() {
       .maybeSingle()
     
     profile = newProfile
+  }
+
+  // Force upgrade for specific user if they are currently a 'user' but should be 'admin'
+  if (profile && profile.email === 'prilgupta017@gmail.com' && profile.role !== 'admin') {
+    const adminClient = createAdminClient()
+    await adminClient
+      .from('profiles')
+      .update({ role: 'admin' })
+      .eq('id', user.id)
+    
+    // Refresh the local profile object
+    profile.role = 'admin'
   }
 
   const { data: scores } = await supabase
@@ -184,6 +197,15 @@ export default async function DashboardPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {(profile as { role?: string })?.role === 'admin' && (
+                <Link
+                  href="/admin"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-gray-900 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-white hover:bg-gray-800"
+                >
+                  <Shield className="h-3.5 w-3.5" />
+                  Admin
+                </Link>
+              )}
               <Link
                 href="/draws"
                 className="hidden text-sm font-bold text-green-700 hover:text-green-800 sm:inline"
@@ -210,6 +232,40 @@ export default async function DashboardPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <CheckoutSuccessSync />
+        
+        {profile?.role === 'admin' && (
+          <div className="mb-10 p-6 rounded-3xl bg-gray-900 text-white shadow-xl shadow-gray-900/20 overflow-hidden relative group">
+            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Shield className="w-32 h-32 rotate-12" />
+            </div>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <h3 className="text-2xl font-black tracking-tight mb-2 flex items-center gap-2">
+                  <Shield className="w-6 h-6 text-green-400" />
+                  Administrator Portal
+                </h3>
+                <p className="text-gray-400 font-medium max-w-xl">
+                  You have full access to manage draws, verify winners, and oversight charity contributions.
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <Link
+                  href="/admin"
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black uppercase tracking-widest text-sm transition-all shadow-lg shadow-green-600/30"
+                >
+                  Enter Admin Panel
+                </Link>
+                <Link
+                  href="/admin/draws"
+                  className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-black uppercase tracking-widest text-sm transition-all border border-white/10"
+                >
+                  Quick Draw
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Welcome Section */}
         <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>

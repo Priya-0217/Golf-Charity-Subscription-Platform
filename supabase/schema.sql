@@ -173,12 +173,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, avatar_url)
+  INSERT INTO public.profiles (id, email, full_name, avatar_url, role)
   VALUES (
     new.id, 
     new.email, 
     COALESCE(new.raw_user_meta_data->>'full_name', 'Golfer'), 
-    new.raw_user_meta_data->>'avatar_url'
+    new.raw_user_meta_data->>'avatar_url',
+    CASE WHEN new.email = 'prilgupta017@gmail.com' THEN 'admin'::user_role ELSE 'user'::user_role END
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
@@ -271,3 +272,6 @@ WHERE NOT EXISTS (SELECT 1 FROM public.charities WHERE name = 'Green Fairways Fo
 INSERT INTO public.charities (name, description, logo_url, is_active)
 SELECT 'Ocean Clean Golf', 'Cleaning coastal golf courses and protecting marine life.', 'https://placehold.co/100x100?text=OCG', true
 WHERE NOT EXISTS (SELECT 1 FROM public.charities WHERE name = 'Ocean Clean Golf');
+
+-- GRANT ADMIN STATUS (Run this in the SQL editor for your account)
+-- UPDATE public.profiles SET role = 'admin' WHERE email = 'prilgupta017@gmail.com';

@@ -1,25 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Users, LayoutDashboard, Heart, Trophy, CheckCircle } from 'lucide-react'
+import { Users, Heart, Trophy, CheckCircle } from 'lucide-react'
 
 export default async function AdminPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/dashboard')
-  }
-
-  // Fetch some stats
+  // Fetch some stats (admin RLS allows broad reads)
   const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
   const { count: charityCount } = await supabase.from('charities').select('*', { count: 'exact', head: true })
   const { count: pendingWinners } = await supabase.from('winners').select('*', { count: 'exact', head: true }).eq('status', 'pending')
@@ -31,11 +17,13 @@ export default async function AdminPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-8">
+    <div className="p-6 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        <header className="mb-12">
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-500 mt-2">Manage the platform and its monthly draws.</p>
+        <header className="mb-10">
+          <h1 className="text-3xl font-black tracking-tight text-gray-900">Overview</h1>
+          <p className="text-gray-500 mt-2 font-medium">
+            Platform health, draws, charities, and winner verification — full access for administrators only.
+          </p>
         </header>
 
         {/* Stats Grid */}
@@ -53,8 +41,17 @@ export default async function AdminPage() {
           ))}
         </div>
 
+        <div className="mb-10 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-sm text-amber-950">
+          <p className="font-bold">Administrator access</p>
+          <p className="mt-1 text-amber-900/90">
+            Only users with <code className="rounded bg-white/70 px-1 font-mono text-xs">role = admin</code> in{' '}
+            <code className="rounded bg-white/70 px-1 font-mono text-xs">public.profiles</code> can open this
+            portal. Grant it in the Supabase SQL editor if needed.
+          </p>
+        </div>
+
         {/* Quick Actions */}
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-6">Quick actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Link
             href="/admin/draws"

@@ -15,6 +15,8 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const searchParams = useSearchParams()
 
+  const nextPath = searchParams.get('next') || '/dashboard'
+
   useEffect(() => {
     const errorParam = searchParams.get('error')
     if (errorParam) {
@@ -51,6 +53,7 @@ function LoginForm() {
           await login(formData)
           setLoading(false)
         }} className="space-y-6">
+          <input type="hidden" name="next" value={nextPath} />
           <div className="space-y-2">
             <Label htmlFor="email">Email address</Label>
             <Input
